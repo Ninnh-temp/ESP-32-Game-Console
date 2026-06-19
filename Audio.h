@@ -5,9 +5,9 @@
 #include <driver/i2s.h>
 
 // --- I2S PIN DEFINITIONS ---
-#define I2S_DOUT      27
+#define I2S_DOUT      25
 #define I2S_BCLK      26
-#define I2S_LRC       25
+#define I2S_LRC       27
 
 enum SoundEffect { SFX_NONE, SFX_SHOOT, SFX_HIT, SFX_DASH, SFX_HEAL };
 
@@ -24,7 +24,6 @@ void audioTask(void *pvParameters) {
     if (currentSFX == SFX_NONE) {
       memset(sampleBuffer, 0, sizeof(sampleBuffer));
       i2s_write(I2S_NUM_0, sampleBuffer, sizeof(sampleBuffer), &bytesWritten, portMAX_DELAY);
-      vTaskDelay(10 / portTICK_PERIOD_MS); 
       continue;
     }
 
@@ -79,7 +78,8 @@ void initAudio() {
       .intr_alloc_flags = ESP_INTR_FLAG_LEVEL1,
       .dma_buf_count = 4,
       .dma_buf_len = 256,
-      .use_apll = false
+      .use_apll = false,
+      .tx_desc_auto_clear = true
   };
   
   i2s_pin_config_t pin_config = {
