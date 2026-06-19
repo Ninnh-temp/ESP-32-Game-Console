@@ -2,78 +2,10 @@
 #include <SPI.h>
 #include <TFT_eSPI.h> 
 #include "Stages.h"
+#include "Audio.h"
 
 #include <driver/i2s.h>
 
-// --- I2S AUDIO SYNTHESIZER ---
-#define I2S_DOUT      22
-#define I2S_BCLK      26
-#define I2S_LRC       25  
-
-enum SoundEffect { SFX_NONE, SFX_SHOOT, SFX_HIT, SFX_DASH, SFX_HEAL };
-volatile SoundEffect currentSFX = SFX_NONE;
-volatile int sfxFrame = 0; // Tracks how long the sound has been playing
-
-// The background audio task that runs on Core 0
-void audioTask(void *pvParameters) {
-  int16_t sampleBuffer[256];
-  size_t bytesWritten;
-  
-  while (true) {
-    if (currentSFX == SFX_NONE) {
-      // If no sound, output absolute silence to prevent speaker static
-      memset(sampleBuffer, 0, sizeof(sampleBuffer));
-      i2s_write(I2S_NUM_0, sampleBuffer, sizeof(sampleBuffer), &bytesWritten, portMAX_DELAY);
-      vTaskDelay(10 / portTICK_PERIOD_MS); 
-      continue;
-    }
-
-    // Synthesize the sound wave block by block
-    for (int i = 0; i < 256; i++) {
-      int16_t sample = 0;
-      sfxFrame++;
-
-      switch (currentSFX) {
-        case SFX_SHOOT:
-          // Fast descending pitch (Square wave)
-          if (sfxFrame > 4000) currentSFX = SFX_NONE;
-          else sample = ((sfxFrame % (20 + (sfxFrame/100))) < 10) ? 8000 : -8000;
-          break;
-
-        case SFX_HIT:
-          // White noise burst (Explosion/Hit)
-          if (sfxFrame > 3000) currentSFX = SFX_NONE;
-          else sample = random(-10000, 10000) * (1.0 - (sfxFrame / 3000.0)); // Fade out
-          break;
-
-        case SFX_DASH:
-          // Fast ascending sweep
-          if (sfxFrame > 2000) currentSFX = SFX_NONE;
-          else sample = ((sfxFrame % (60 - (sfxFrame/50))) < 30) ? 6000 : -6000;
-          break;
-
-        case SFX_HEAL:
-          // Happy high-pitched chime
-          if (sfxFrame > 5000) currentSFX = SFX_NONE;
-          else sample = ((sfxFrame % 15) < 7) ? 4000 : -4000;
-          break;
-          
-        default:
-          currentSFX = SFX_NONE;
-          break;
-      }
-      sampleBuffer[i] = sample;
-    }
-    // Push the 256 generated audio samples to the MAX98357A amplifier
-    i2s_write(I2S_NUM_0, sampleBuffer, sizeof(sampleBuffer), &bytesWritten, portMAX_DELAY);
-  }
-}
-
-// Helper function to trigger sounds easily from the game loop
-void playSound(SoundEffect sfx) {
-  currentSFX = sfx;
-  sfxFrame = 0; // Reset the sound timeline
-}
 
 // Create the screen object
 TFT_eSPI tft = TFT_eSPI(); 
@@ -81,7 +13,7 @@ TFT_eSprite canvas = TFT_eSprite(&tft);
 
 // --- CONTROLLER PINS ---
 const int btnUp = 13; const int btnDown = 14;
-const int btnLeft = 32; const int btnRight = 33;  
+const int btnLeft = 33; const int btnRight = 32;  
 const int btnA = 16; const int btnB = 17;
 
 unsigned long lastFrameTime = 0;
@@ -265,7 +197,7 @@ bool prevDpad[4] = {true, true, true, true};
 const int doubleTapWindow = 250; // ms for double tap
 
 // Box Collision Helper
-bool checkCollision(int x1, int y1, int w1, int h1, int x2, int y2, int w2, int h2) {
+bool checkCollision(float x1, float y1, float w1, float h1, float x2, float y2, float w2, float h2) {
   return (x1 < x2 + w2 && x1 + w1 > x2 && y1 < y2 + h2 && y1 + h1 > y2);
 }
 
@@ -318,6 +250,8 @@ void spawnWave() {
       enemies[enemyIndex].timer = millis();
       enemies[enemyIndex].prevX = enemies[enemyIndex].x;
       enemies[enemyIndex].prevY = enemies[enemyIndex].y;
+      enemies[enemyIndex].lockDirX = 0;
+      enemies[enemyIndex].lockDirY = 0;
       
       switch(enemies[enemyIndex].type) {
         case ENEMY_SHOOTER:
@@ -455,6 +389,7 @@ void updateEnemies() {
             float dy = (player.y + 4) - (e.y + 4);
             float mag = sqrt(dx*dx + dy*dy);
             if (mag > 0) { e.lockDirX = dx/mag; e.lockDirY = dy/mag; }
+            else { e.lockDirX = 0; e.lockDirY = 0; }
           } else {
             e.state = STATE_FROZEN_SHOOT;
             e.timer = millis();
@@ -1010,13 +945,13 @@ void drawMenuButton(int cx, int cy, int w, int h, const char* text, bool isSelec
   for (int i = 0; i < w; i++) {
     if (i % 6 < 3 || i % 6 == 4) { 
       canvas.drawPixel(x + i, y, outColor); 
-      canvas.drawPixel(x + i, y + h, outColor); 
+      canvas.drawPixel(x + i, y + h - 1, outColor); 
     } 
   }
   for (int i = 0; i < h; i++) {
     if (i % 6 < 3 || i % 6 == 4) { 
       canvas.drawPixel(x, y + i, outColor); 
-      canvas.drawPixel(x + w, y + i, outColor); 
+      canvas.drawPixel(x + w - 1, y + i, outColor); 
     } 
   }
   canvas.setTextColor(outColor);
@@ -1142,6 +1077,7 @@ void setup() {
   canvas.setSwapBytes(true);
 
   randomSeed(analogRead(34)); 
+  initAudio();
 }
 
 void loop() {
@@ -1181,29 +1117,4 @@ void loop() {
       break;
   }
   
-  // Initialize I2S Audio
-  i2s_config_t i2s_config = {
-      .mode = (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_TX),
-      .sample_rate = 16000, // 16kHz is perfect for retro 8-bit audio
-      .bits_per_sample = I2S_BITS_PER_SAMPLE_16BIT,
-      .channel_format = I2S_CHANNEL_FMT_ONLY_LEFT,
-      .communication_format = I2S_COMM_FORMAT_STAND_I2S,
-      .intr_alloc_flags = ESP_INTR_FLAG_LEVEL1,
-      .dma_buf_count = 4,
-      .dma_buf_len = 256,
-      .use_apll = false
-  };
-  
-  i2s_pin_config_t pin_config = {
-      .bck_io_num = I2S_BCLK,
-      .ws_io_num = I2S_LRC,
-      .data_out_num = I2S_DOUT,
-      .data_in_num = I2S_PIN_NO_CHANGE
-  };
-
-  i2s_driver_install(I2S_NUM_0, &i2s_config, 0, NULL);
-  i2s_set_pin(I2S_NUM_0, &pin_config);
-
-  // Pin the Audio Task to Core 0!
-  xTaskCreatePinnedToCore(audioTask, "AudioTask", 2048, NULL, 1, NULL, 0);
 }

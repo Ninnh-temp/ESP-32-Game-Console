@@ -55,10 +55,43 @@ const Stage stages[] = {
       { { {ENEMY_BAT, 3}, {ENEMY_SHOOTER, 2} }, 2 }
     },
     1, // 1 wave
-    { false, 0, 0, 0, 0 } // No wall
+    { true, -20, -5, 10, 10 } // Small obstruction block
+  },
+  // Stage 3
+  {
+    {
+      // Wave 0
+      { { {ENEMY_BAT, 4} }, 1 },
+      // Wave 1
+      { { {ENEMY_SHOOTER, 3}, {ENEMY_BRUTE, 1} }, 2 },
+      // Wave 2
+      { { {ENEMY_BAT, 2}, {ENEMY_SHOOTER, 2}, {ENEMY_BRUTE, 1} }, 3 }
+    },
+    3, 
+    { true, 0, -20, 60, 10 } // Wide horizontal platform
+  },
+  // Stage 4
+  {
+    {
+      // Wave 0
+      { { {ENEMY_BAT, 4}, {ENEMY_BRUTE, 4} }, 2 }
+    },
+    1, // 1 wave
+    { true, 20, -25, 20, 50 } // High column on the right
+  },
+  // Stage 5
+  {
+    {
+      // Wave 0
+      { { {ENEMY_SHOOTER, 4}, {ENEMY_BRUTE, 2} }, 2 },
+      // Wave 1
+      { { {ENEMY_BAT, 6}, {ENEMY_SHOOTER, 3}, {ENEMY_BRUTE, 4} }, 3 }
+    },
+    2, // 2 waves
+    { true, -15, -15, 25, 25 } // Medium square block on the left
   }
 };
 
-const int MAX_STAGES = 3;
+const int MAX_STAGES = 6;
 
 #endif
