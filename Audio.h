@@ -4,7 +4,6 @@
 #include <Arduino.h>
 #include <driver/i2s.h>
 
-// --- I2S PIN DEFINITIONS ---
 #define I2S_DOUT      25
 #define I2S_BCLK      26
 #define I2S_LRC       27
@@ -27,7 +26,7 @@ void audioTask(void *pvParameters) {
       continue;
     }
 
-    for (int i = 0; i < 256; i++) {
+    for (int i = 0; i < 256; i += 2) {
       int16_t sample = 0;
       sfxFrame++;
 
@@ -57,6 +56,7 @@ void audioTask(void *pvParameters) {
           break;
       }
       sampleBuffer[i] = sample;
+      sampleBuffer[i+1] = sample;
     }
     i2s_write(I2S_NUM_0, sampleBuffer, sizeof(sampleBuffer), &bytesWritten, portMAX_DELAY);
   }
@@ -73,7 +73,7 @@ void initAudio() {
       .mode = (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_TX),
       .sample_rate = 16000, 
       .bits_per_sample = I2S_BITS_PER_SAMPLE_16BIT,
-      .channel_format = I2S_CHANNEL_FMT_ONLY_LEFT,
+      .channel_format = I2S_CHANNEL_FMT_RIGHT_LEFT, // Changed to stereo clock format
       .communication_format = I2S_COMM_FORMAT_STAND_I2S,
       .intr_alloc_flags = ESP_INTR_FLAG_LEVEL1,
       .dma_buf_count = 4,
@@ -94,6 +94,9 @@ void initAudio() {
 
   // Pin the synthesizer to Core 0
   xTaskCreatePinnedToCore(audioTask, "AudioTask", 2048, NULL, 1, NULL, 0); 
+  
+  // Play a quick sound so we know the speaker works on startup!
+  playSound(SFX_HEAL);
 }
 
 #endif

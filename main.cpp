@@ -564,19 +564,19 @@ void updatePlayer() {
 
   if (!player.isDashing) {
     if (currentUp && !prevDpad[0]) {
-      if (millis() - lastTapTime[0] < doubleTapWindow) { player.isDashing = true; player.dashDirX = 0; player.dashDirY = -1; player.dashTimer = millis(); }
+      if (millis() - lastTapTime[0] < doubleTapWindow) { player.isDashing = true; player.dashDirX = 0; player.dashDirY = -1; player.dashTimer = millis(); playSound(SFX_DASH); }
       lastTapTime[0] = millis();
     }
     if (currentDown && !prevDpad[1]) {
-      if (millis() - lastTapTime[1] < doubleTapWindow) { player.isDashing = true; player.dashDirX = 0; player.dashDirY = 1; player.dashTimer = millis(); }
+      if (millis() - lastTapTime[1] < doubleTapWindow) { player.isDashing = true; player.dashDirX = 0; player.dashDirY = 1; player.dashTimer = millis(); playSound(SFX_DASH); }
       lastTapTime[1] = millis();
     }
     if (currentLeft && !prevDpad[2]) {
-      if (millis() - lastTapTime[2] < doubleTapWindow) { player.isDashing = true; player.dashDirX = -1; player.dashDirY = 0; player.dashTimer = millis(); }
+      if (millis() - lastTapTime[2] < doubleTapWindow) { player.isDashing = true; player.dashDirX = -1; player.dashDirY = 0; player.dashTimer = millis(); playSound(SFX_DASH); }
       lastTapTime[2] = millis();
     }
     if (currentRight && !prevDpad[3]) {
-      if (millis() - lastTapTime[3] < doubleTapWindow) { player.isDashing = true; player.dashDirX = 1; player.dashDirY = 0; player.dashTimer = millis(); }
+      if (millis() - lastTapTime[3] < doubleTapWindow) { player.isDashing = true; player.dashDirX = 1; player.dashDirY = 0; player.dashTimer = millis(); playSound(SFX_DASH); }
       lastTapTime[3] = millis();
     }
   }
@@ -686,6 +686,7 @@ void updatePlayer() {
           bullets[i].dirY = player.facingY;
           if (bullets[i].dirX == 0 && bullets[i].dirY == 0) bullets[i].dirX = 1;
           bullets[i].speed = 5;
+          playSound(SFX_SHOOT);
           break;
         }
       }
@@ -710,6 +711,7 @@ void updatePlayer() {
           enemies[e].x += bullets[i].dirX * 10;
           enemies[e].y += bullets[i].dirY * 10;
           hitEnemy = true;
+          playSound(SFX_HIT);
           if (enemies[e].health <= 0) enemies[e].active = false;
           break;
         }
@@ -733,6 +735,7 @@ void updatePlayer() {
           player.isInvulnerable = true;
           player.invulnerableTimer = millis();
           hitFlashTimer = 5;
+          playSound(SFX_HIT);
         }
       }
       
