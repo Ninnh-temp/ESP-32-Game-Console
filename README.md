@@ -1,5 +1,5 @@
 # Genericgame
-# 🕹️ ESP32 Bare-Metal 2D Game Console
+# 🕹️ ESP32 2D Game Console
 
 ![C++](https://img.shields.io/badge/Language-C++-blue)
 ![Platform](https://img.shields.io/badge/Platform-ESP32-orange)
