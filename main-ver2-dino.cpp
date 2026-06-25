@@ -1,4 +1,4 @@
-﻿#include <Arduino.h>
+#include <Arduino.h>
 #include <SPI.h>
 #include <TFT_eSPI.h> 
 #include "Stages.h"
@@ -101,13 +101,13 @@ struct Dino { float x, y; float yVelocity; int w, h; bool isJumping; };
 Dino dinoPlayer;
 
 struct Obstacle { float x, y; int w, h; bool active; };
-const int MAX_OBSTACLES = 2;
+const int MAX_OBSTACLES = 3;
 Obstacle cacti[MAX_OBSTACLES];
 
 const float GRAVITY = 1.2;
 const float JUMP_FORCE = -10.0;
 const int GROUND_Y = 100;
-float dinoSpeed = 4.0;
+float dinoSpeed = 3.0;
 int dinoScore = 0;
 int dinoHighScore = 0;
 
@@ -133,12 +133,13 @@ void dino_initGame() {
   dinoPlayer.y = GROUND_Y - dinoPlayer.h;
   dinoPlayer.yVelocity = 0; dinoPlayer.isJumping = false;
   
-  dinoSpeed = 4.0; 
+  dinoSpeed = 3.0; 
   dinoScore = 0;
   
   cacti[0].active = true; cacti[0].w = 8; cacti[0].h = 16; 
   cacti[0].x = 160; cacti[0].y = GROUND_Y - cacti[0].h;
   cacti[1].active = false;
+  cacti[2].active = false;
 }
 
 void dino_updateTitle() {
@@ -194,15 +195,41 @@ void dino_updatePlaying() {
     if (cacti[i].active) {
       cacti[i].x -= dinoSpeed;
       if (cacti[i].x < -cacti[i].w) {
-        cacti[i].x = 160 + random(20, 100);
-        cacti[i].h = random(12, 22); cacti[i].y = GROUND_Y - cacti[i].h;
         dinoScore++;
         
-        if (dinoScore % 5 == 0) { dinoSpeed += 0.5; playSound(SFX_HEAL); }
         
-        if (dinoScore > 10 && !cacti[1].active && random(0, 3) == 1) {
-          cacti[1].active = true; cacti[1].x = cacti[0].x + random(80, 120);
+      if (dinoScore > 0 && dinoScore % 10 == 0) { dinoSpeed += 0.4; playSound(SFX_HEAL); }
+        
+        float maxX = 160;
+        for (int j = 0; j < MAX_OBSTACLES; j++) {
+          if (j != i && cacti[j].active && cacti[j].x > maxX) {
+            maxX = cacti[j].x;
+          }
+        }
+        
+        // 30% chance to spawn a cluster of cacti 
+        // Otherwise, provide a safe landing gap that scales gently with speed.
+        int gap;
+        if (dinoScore >= 15 && random(0, 100) < 30) {
+          gap = random(12, 24); // Tight cluster (12 to 24 pixels apart)
+        } else {
+          gap = 60 + (int)((dinoSpeed - 3.0) * 10) + random(0, 50); // Safe landing gap
+        }
+
+        cacti[i].x = maxX + gap;
+        cacti[i].h = random(12, 22); cacti[i].y = GROUND_Y - cacti[i].h;
+
+        // Unlock 2nd obstacle at score 20
+        if (dinoScore >= 20 && !cacti[1].active) {
+          int gap2 = (random(0, 100) < 30) ? random(12, 24) : (60 + (int)((dinoSpeed - 3.0) * 10) + random(0, 50));
+          cacti[1].active = true; cacti[1].x = cacti[i].x + gap2;
           cacti[1].w = 8; cacti[1].h = random(10, 16); cacti[1].y = GROUND_Y - cacti[1].h;
+        }
+        // Unlock 3rd obstacle at score 50
+        if (dinoScore >= 50 && !cacti[2].active) {
+          int gap3 = (random(0, 100) < 30) ? random(12, 24) : (60 + (int)((dinoSpeed - 3.0) * 10) + random(0, 50));
+          cacti[2].active = true; cacti[2].x = cacti[i].x + gap3;
+          cacti[2].w = 8; cacti[2].h = random(10, 16); cacti[2].y = GROUND_Y - cacti[2].h;
         }
       }
       if (checkCollision(dinoPlayer.x+2, dinoPlayer.y+2, dinoPlayer.w-4, dinoPlayer.h-4, cacti[i].x+1, cacti[i].y+1, cacti[i].w-2, cacti[i].h-2)) {
@@ -217,8 +244,8 @@ void dino_updatePlaying() {
   canvas.drawLine(0, GROUND_Y, 160, GROUND_Y, TFT_WHITE);
   
   for(int i = 0; i < 160; i+=20) {
-    // FIXED: Multiply then divide to completely prevent Divide-by-Zero exception at high speeds
-    int lineX = (i - ((millis() * (int)dinoSpeed / 10) % 20));
+    // FIXED: Multiply then divide to prevent Divide-by-Zero exception at high speeds
+    int lineX = (i - (int)((millis() * (int)dinoSpeed / 10) % 20));
     if (lineX > 0) canvas.drawPixel(lineX, GROUND_Y + 2 + (i%3), TFT_LIGHTGREY);
   }
   
@@ -234,6 +261,14 @@ void dino_updatePlaying() {
   canvas.setTextColor(TFT_WHITE); canvas.setTextDatum(TR_DATUM);
   char scoreText[16]; sprintf(scoreText, "HI:%03d  %03d", dinoHighScore, dinoScore);
   canvas.drawString(scoreText, 155, 5, 1);
+  
+  // HUD UI - Floating Point Speed Tracker
+  canvas.setTextDatum(TL_DATUM);
+  char speedText[16]; 
+  // Using integer isolation trick so floats don't fragment the ESP32 PROGMEM
+  sprintf(speedText, "SPD: %d.%d", (int)dinoSpeed, (int)(dinoSpeed * 10) % 10);
+  canvas.drawString(speedText, 5, 5, 1);
+  
   canvas.pushSprite(0, 0);
 }
 
